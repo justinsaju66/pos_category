@@ -53,19 +53,19 @@ patch(PaymentScreen.prototype, {
         }
 
         // === CATEGORY DISCOUNT CHECK ===
-        const categoryDiscountEnabled = session?.category_discount ?? false;
-        const selectedCategoryId = Array.isArray(session?.select_category_id)
-            ? session.select_category_id[0]
-            : session?.select_category_id;
-        const maxAllowedDiscount = session?.max_discount ?? 0;
-        let totalCategoryDiscount = 0;
+        if (session?.category_discount) { // Check if category discount is enabled
+            const selectedCategoryId = session?.select_category_id?.name || session?.select_category_id;
+            console.log(selectedCategoryId);
+            const maxAllowedDiscount = session?.max_discount ?? 0;
+            console.log(maxAllowedDiscount);
+            let totalCategoryDiscount = 0;
 
-        if (categoryDiscountEnabled && selectedCategoryId) {
+            // Loop through the order lines and calculate the discount for products in the selected category
             order.get_orderlines().forEach(line => {
-                const productCategoryId = Array.isArray(line.product?.pos_categ_id)
-                    ? line.product.pos_categ_id[0]
-                    : line.product?.pos_categ_id;
+                const productCategoryId = line.product?.pos_categ_id?.[0];
+                console.log(productCategoryId)
 
+                // Only apply discount validation if the product's category matches the selected category
                 if (productCategoryId === selectedCategoryId) {
                     const unitPrice = line.get_unit_price();
                     const discount = line.get_discount();
@@ -75,18 +75,22 @@ patch(PaymentScreen.prototype, {
                 }
             });
 
-            if (totalCategoryDiscount > 0 && totalCategoryDiscount > maxAllowedDiscount) {
-                await this.notification.add(_t("Discount for selected category exceeds the allowed limit of " + maxAllowedDiscount), {
-                    title: "Validation Error",
-                    type: "warning"
-                });
-                return;
-            }
+            // Apply the discount check only if there is any discount for the selected category
+            if (totalCategoryDiscount > 0) {
+                if (totalCategoryDiscount > maxAllowedDiscount) {
+                    await this.notification.add(_t("Discount for selected category exceeds the allowed limit of " + maxAllowedDiscount), {
+                        title: "Validation Error",
+                        type: "warning"
+                    });
+                    return;
+                }
 
-            await rpc("/pos/check_and_update_category_discount", {
-                session_id: session.id,
-                used_discount: totalCategoryDiscount,
-            });
+                // ✅ Update used category discount in the backend only for the selected category
+                await rpc("/pos/check_and_update_category_discount", {
+                    session_id: session.id,
+                    used_discount: totalCategoryDiscount,
+                });
+            }
         }
 
         return super.validateOrder(isForceValidate);
