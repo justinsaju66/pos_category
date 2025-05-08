@@ -3,15 +3,16 @@ import { patch } from "@web/core/utils/patch";
 import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
 import { _t } from "@web/core/l10n/translation";
 import { rpc } from "@web/core/network/rpc";
+import { AlertDialog } from "@web/core/confirmation_dialog/confirmation_dialog";
 
 patch(PaymentScreen.prototype, {
     async validateOrder(isForceValidate) {
         const session = this.pos.config.current_session_id;
 
-        // ✅ Only proceed if category discount check is enabled
+        // Only proceed if category discount check is enabled
         if (session?.category_discount) {
             const selectedCategoryId = session?.select_category_id?.id;
-            console.log('Selected Category ID:', selectedCategoryId);
+            console.log( selectedCategoryId);
             const maxAllowedDiscount = session?.max_discount ?? 0;
 
             const order = this.pos.get_order();
@@ -44,10 +45,10 @@ patch(PaymentScreen.prototype, {
 
             if (totalCategoryDiscount > 0) {
                 if (totalCategoryDiscount > maxAllowedDiscount) {
-                    await this.notification.add(_t(`Discount for selected category exceeds the allowed limit of ${maxAllowedDiscount}`), {
-                        title: "Validation Error",
-                        type: "warning"
-                    });
+                    await this.env.services.dialog.add(AlertDialog, {
+                    title: _t("Discount Error"),
+                    body: _t("Category discount limit exceeded."),
+                });
                     return;
                 }
 
